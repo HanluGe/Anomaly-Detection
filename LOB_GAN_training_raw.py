@@ -265,6 +265,7 @@ def train_lob_gan(
     print(f"Start training {stock}: epochs={epochs}, batch_size={batch_size}, lr_g={lr_g}, lr_d={lr_d}")
 
     #training starts here
+    ## 在 train_dataloader 上训练（有反向传播 + 更新参数）
     for epoch in range(epochs):
         for i, data in enumerate(train_dataloader):
     
@@ -321,9 +322,10 @@ def train_lob_gan(
                                                                              d_loss.item(), g_loss.item()))
     
         #validation data set
+
         g_loss_total = 0
         d_loss_total = 0
-        for i, data in enumerate(eval_dataloader):
+        for i, data in enumerate(eval_dataloader): # 在 eval_dataloader 上验证（只算 loss，不更新参数，用来监控 & early stopping）
     
             #real vs. noise
             real = torch.ones(data.size(0), 1)
