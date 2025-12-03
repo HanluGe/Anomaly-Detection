@@ -350,22 +350,42 @@ def analyze_microstructure(
     disc_scores = np.array(disc_scores)
     assert disc_scores.shape[0] == projdata.shape[0]
 
-    abnormal_mask = disc_scores <= threshold  # True: abnormal day -- 原来的threshold！！！
-    # # =======================================
-    # #  Quantile-based thresholding  ← NEW
-    # #  e.g. choose lowest q fraction as abnormal
-    # # =======================================
-    # if 0 < threshold < 1:
-    #     # interpret threshold as quantile
-    #     q_value = np.quantile(disc_scores, threshold)
-    #     print(f"Using quantile threshold: q={threshold}, cutoff={q_value:.4f}")
-    #     abnormal_mask = disc_scores <= q_value
-    # else:
-    #     # fallback to raw threshold
-    #     abnormal_mask = disc_scores <= threshold
+    N_days = disc_scores.shape[0]
 
-    print(f"Total days: {len(abnormal_mask)}, abnormal days: {abnormal_mask.sum()} "
-          f"({abnormal_mask.sum()/len(abnormal_mask):.2%})")
+    mu = disc_scores.mean()
+    sig = disc_scores.std()
+
+    # 以 mean - 0.5*std 作为 threshold
+    cutoff = mu - 0.5 * sig
+    abnormal_mask = disc_scores <= cutoff
+
+    abnormal_rate = abnormal_mask.mean()
+    print(f"Disc score mean={mu:.4f}, std={sig:.4f}, cutoff={cutoff:.4f}")
+    print(f"Total days: {N_days}, abnormal days: {abnormal_mask.sum()} "
+          f"({abnormal_rate:.2%})")
+
+    # 可选：如果还是0%或100%，你再手动 fallback
+    if abnormal_rate == 0:
+        q = 0.05
+        cutoff = np.quantile(disc_scores, q)
+        abnormal_mask = disc_scores <= cutoff
+        abnormal_rate = abnormal_mask.mean()
+        print(f"[Fallback] Using bottom {q:.0%} quantile cutoff={cutoff:.4f}, "
+              f"abnormal_rate={abnormal_rate:.2%}")
+    elif abnormal_rate == 1:
+        q = 0.95
+        cutoff = np.quantile(disc_scores, q)
+        abnormal_mask = disc_scores >= cutoff
+        abnormal_rate = abnormal_mask.mean()
+        print(f"[Fallback] Using top {1-q:.0%} quantile cutoff={cutoff:.4f}, "
+              f"abnormal_rate={abnormal_rate:.2%}")
+
+
+
+    # abnormal_mask = disc_scores <= threshold  # True: abnormal day -- 原来的threshold！！！
+
+    # print(f"Total days: {len(abnormal_mask)}, abnormal days: {abnormal_mask.sum()} "
+    #       f"({abnormal_mask.sum()/len(abnormal_mask):.2%})")
 
     # ---------- 6. 计算 microstructure 变量（分钟级 snapshot） ----------
     # projdata shape: (N_days, T=265, 25)
