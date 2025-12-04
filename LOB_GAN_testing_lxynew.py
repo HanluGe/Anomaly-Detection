@@ -27,6 +27,7 @@ from scipy.stats import ks_2samp, skew, kurtosis  # KS 检验 + 偏度/峰度
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 RESULTS_DIR = os.path.join(BASE_DIR, "Results")
+MODEL_RESULTS_DIR = os.path.join(BASE_DIR, "model_results")
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
 
@@ -296,12 +297,15 @@ def analyze_microstructure(
     print("Minutely data generated.")
 
     projdata = []
-    for _, day_df in minutelyData.groupby('date'):
+    dates = []
+    for d, day_df in minutelyData.groupby('date'):
         if day_df.shape[0] == 265:
             projdata.append(day_df.values)
+            dates.append(d) 
 
     projdata = np.array(projdata)   # shape: (N_days, 265, 25)
-
+    dates = np.array(dates) 
+    
     if projdata.size == 0:
         print("No full 265-min days found.")
         return None, None
@@ -380,7 +384,19 @@ def analyze_microstructure(
         print(f"[Fallback] Using top {1-q:.0%} quantile cutoff={cutoff:.4f}, "
               f"abnormal_rate={abnormal_rate:.2%}")
 
+    # ---------- 5.3 把每日的结果保存下来 ----------
+    results_day_df = pd.DataFrame({
+        "date": dates.astype(str),                 # 每天的日期
+        "disc_score": disc_scores,                 # Discriminator 输出的分数
+        "is_abnormal": abnormal_mask.astype(int),  # 1 = abnormal, 0 = normal
+    })
 
+    outfile_days = os.path.join(
+        MODEL_RESULTS_DIR,
+        f"{stock_code}_abnormal_days_{version}.csv"
+    )
+    results_day_df.to_csv(outfile_days, index=False, encoding="utf-8-sig")
+    print("Saved day-level abnormal results to:", outfile_days)
 
     # abnormal_mask = disc_scores <= threshold  # True: abnormal day -- 原来的threshold！！！
 
